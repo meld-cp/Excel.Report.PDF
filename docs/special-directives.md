@@ -44,19 +44,52 @@ Normally only cells containing values (or with a non-default fill, border, etc.)
 
 Use this when you want a cell's *presence* (and therefore its borders/fills) to count, but the actual text to remain invisible.
 
-## `#FitColumn`
+## Print scaling — zoom percentage and fit-to-width
+
+The renderer reproduces Excel's **page-setup scaling** so the PDF comes out the same size you would get from Excel's own print. There are two ways to control it, and they are mutually exclusive.
+
+### Option 1 — Fixed zoom percentage
+
+The renderer reads `PageSetup.Scale` (Excel's *Adjust to: NN %* setting) and scales every cell by that factor. `100` is full size; `80` shrinks to 80 %; `150` enlarges to 150 %. A `Scale` of `0` is treated as `100`.
+
+**In Excel:** Page Layout → Page Setup (the ⤢ dialog launcher) → *Scaling* → **Adjust to: `NN` % normal size**.
+
+<img src="../Image/PageScalingZoom.png" width="420">
+
+**In code (ClosedXML):**
+
+```csharp
+using var book = new XLWorkbook("report.xlsx");
+book.Worksheet(1).PageSetup.Scale = 80;   // render at 80 %
+
+using var ms = new MemoryStream();
+book.SaveAs(ms);
+using var pdf = ExcelConverter.ConvertToPdf(ms, 1);
+```
+
+### Option 2 — Fit to page width
+
+This scales the whole sheet so the **used column width fills the printable page width** (page width minus the left and right margins). Unlike Excel's "Fit to 1 page wide", there is **no** matching height constraint — only the width is fitted, so tall sheets still flow onto additional pages. You can enable it either from a cell directive or from Excel's UI:
 
 ```text
 | #FitColumn |  ← cell A1 only
 ```
 
-When `A1` contains `#FitColumn`, the renderer scales the entire sheet so the **used column width fills the printable page width** (page width minus left and right margins). This is equivalent to enabling Excel's "Fit to 1 page wide" without the per-page height constraint.
+**In Excel:** Page Layout → Page Setup → *Scaling* → **Fit to: `1` page(s) wide**. The library reads only the *wide* value (`PageSetup.PagesWide > 0`) and fits to width; the *tall* value is **ignored**, so the height is never constrained — it makes no difference whether the "tall" box is blank or set to `1`.
+
+<img src="../Image/PageScalingFitWidth.png" width="420">
+
+**In code (ClosedXML):**
+
+```csharp
+book.Worksheet(1).PageSetup.PagesWide = 1;   // same effect as #FitColumn
+```
 
 Notes:
 
 * `#FitColumn` only takes effect in cell `A1`.
-* It overrides the workbook's manual `Scale` percentage for the affected sheet.
-* The library also detects the equivalent Excel setting (`PageSetup.PagesWide > 0`) and applies the same scaling, so you can either set the directive or use Excel's UI.
+* Fit-to-width **overrides** any manual `Scale` percentage — when it is active the zoom value is ignored and the scale is computed from the page width instead.
+* `#FitColumn` (the cell directive) and `PageSetup.PagesWide > 0` (the Excel setting) are equivalent — set either one.
 
 ## Vertical / rotated text
 

@@ -100,6 +100,8 @@ using var pdfFromStream = ExcelConverter.ConvertToPdf(fs);
 
 The renderer respects Excel's page setup (paper size, margins, scaling, page breaks, centering) and reproduces fonts, fills, borders (including `Double`), text rotation, vertical text, and embedded pictures.
 
+> **Print scaling** — set a fixed zoom percentage (`PageSetup.Scale`) or fit the sheet to the page width (`#FitColumn` / `PageSetup.PagesWide`). See **[docs/special-directives.md → Print scaling](docs/special-directives.md#print-scaling--zoom-percentage-and-fit-to-width)**.
+
 ### 3. Overwrite a template, then convert
 
 Drop `$symbols` and `#directives` straight into your `.xlsx` template, then bind a data object at runtime.
@@ -154,7 +156,7 @@ All directives live in cell text. `$` resolves to a value; `#` invokes a functio
 | `#PageCount` | any cell except column A | Render the total page count (resolved after layout). |
 | `#PageOf("/")` | any cell except column A | Render `current<separator>total`. The separator is the literal in the parentheses. |
 | `#Empty` | any cell | Reserve the cell area for layout calculations but draw nothing. |
-| `#FitColumn` | **A1** only | Scale the rendered output so the used column width fills the printable page width. |
+| `#FitColumn` | **A1** only | Scale the rendered output so the used column width fills the printable page width (see [Print scaling](docs/special-directives.md#print-scaling--zoom-percentage-and-fit-to-width)). |
 
 Multiple cell directives can coexist on the same cell separated by `|` (for example `#Empty | #FitColumn`).
 
