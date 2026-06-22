@@ -62,6 +62,7 @@ namespace Test
         const string LoopRootRefInputFileName = "IOverWriteFunctionTest_LoopRootRef.xlsx";
         const string LoopRowDataInputFileName = "IOverWriteFunctionTest_LoopRowData.xlsx";
         const string MultiRowBlockInputFileName = "IOverWriteFunctionTest_MultiRowBlock.xlsx";
+        const string MultiRowBlockEmptyInputFileName = "IOverWriteFunctionTest_MultiRowBlockEmpty.xlsx";
 
         [OneTimeSetUp]
         public void OneTimeSetUp()
@@ -114,6 +115,37 @@ namespace Test
                 Directory.CreateDirectory(TestEnvironment.PdfSrcPath);
                 CreateMultiRowBlockInputWorkbook(multiRowBlockPath);
             }
+
+            var multiRowBlockEmptyPath = Path.Combine(TestEnvironment.PdfSrcPath, MultiRowBlockEmptyInputFileName);
+            if (!File.Exists(multiRowBlockEmptyPath))
+            {
+                Directory.CreateDirectory(TestEnvironment.PdfSrcPath);
+                CreateMultiRowBlockEmptyInputWorkbook(multiRowBlockEmptyPath);
+            }
+        }
+
+        static void CreateMultiRowBlockEmptyInputWorkbook(string path)
+        {
+            using var book = new XLWorkbook();
+            var sheet = book.AddWorksheet("Sheet1");
+
+            // Header row (literal — outside the loop).
+            sheet.Cell(1, 1).SetValue("Header");
+
+            // 2-row #LoopRow block (insert mode). Row 2 is the directive, row 3 is the
+            // block's second row.
+            sheet.Cell(2, 1).SetValue("#LoopRow($Items, item, 2)");
+            sheet.Cell(2, 2).SetValue("$item.Label");
+            sheet.Cell(3, 2).SetValue("$item.Number");
+
+            // Sentinel rows directly below the block. When $Items is empty the block's two
+            // rows (2-3) must be deleted and these two rows must survive — shifted up to
+            // rows 2-3. The pre-fix bug deleted rows i and i+1 top-down, so after row 2 was
+            // removed the second Delete hit FooterA instead of the block's own second row.
+            sheet.Cell(4, 1).SetValue("FooterA");
+            sheet.Cell(5, 1).SetValue("FooterB");
+
+            book.SaveAs(path);
         }
 
         static void CreateLoopRowDataInputWorkbook(string path)
@@ -461,6 +493,46 @@ namespace Test
             sheet.Cell(6, 2).Value.GetText().Is("C");
             sheet.Cell(7, 3).Value.GetText().Is("C/3");
             sheet.Cell(7, 4).Value.GetNumber().Is(3d);
+        }
+
+        // When a multi-row #LoopRow block (rowCopyCount > 1, insert mode) has an empty data
+        // list, the entire block must be deleted and the rows below it must remain intact.
+        //
+        // The pre-fix code deleted rows top-down (sheet.Row(i + j).Delete() for j = 0..N-1).
+        // After deleting row i, the rows below shift up, so the next Delete targets a row that
+        // is no longer part of the block — for a 2-row block at row 2 the second Delete removed
+        // the unrelated row that followed the block (FooterA) while leaving the block's own
+        // second row behind. The fix deletes sheet.Row(i) repeatedly so it always removes the
+        // top of the (shrinking) block.
+        [Test]
+        public async Task EmptyData_MultiRowLoopBlock_DeletesOnlyTheBlock()
+        {
+            var data = new TestData(); // Items is empty.
+
+            var inputPath = Path.Combine(TestEnvironment.PdfSrcPath, MultiRowBlockEmptyInputFileName);
+            var outputPath = Path.Combine(TestEnvironment.TestResultsPath, "IOverWriteFunctionTest_MultiRowBlockEmpty.xlsx");
+
+            using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var book = new XLWorkbook(stream);
+
+            await book.Worksheet(1).OverWrite(new ObjectExcelSymbolConverter(data));
+            book.SaveAs(outputPath);
+
+            var sheet = book.Worksheets.First();
+
+            // Header is untouched.
+            sheet.Cell(1, 1).Value.GetText().Is("Header");
+
+            // The 2-row block (old rows 2-3) is gone; the two sentinel rows shift up into its
+            // place, in order and without loss. The pre-fix bug dropped FooterA and left a
+            // stray template row, so cell (2,1) would not be "FooterA".
+            sheet.Cell(2, 1).Value.GetText().Is("FooterA");
+            sheet.Cell(3, 1).Value.GetText().Is("FooterB");
+
+            // Nothing remains below the shifted sentinels (no leftover template/duplicate row).
+            sheet.Cell(4, 1).Value.Is(Blank.Value);
+            sheet.Cell(2, 2).Value.Is(Blank.Value);
+            sheet.Cell(3, 2).Value.Is(Blank.Value);
         }
     }
 }
