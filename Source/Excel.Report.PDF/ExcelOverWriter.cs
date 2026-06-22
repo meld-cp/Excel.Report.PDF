@@ -206,11 +206,7 @@ namespace Excel.Report.PDF
                 {
                     if (loopInfo.IsInsertMode)
                     {
-                        // 上から消すと複数行で1LoopRow の時に、問題が出る
-                        // 12行目、13行目を削除したいときに、i = 12, j = 0 で 12行目が削除された後、
-                        // 削除したい13行目は、12行目が消えたので、12行目になるが、
-                        // j++ で Delete されるのは13行目になり、関係ない元14行目が削除される
-                        for (int j = loopInfo.RowCopyCount -1;j >= 0; j--)
+                        for (int j = 0; j < loopInfo.RowCopyCount; j++)
                         {
                             sheet.Row(i).Delete();
                         }
