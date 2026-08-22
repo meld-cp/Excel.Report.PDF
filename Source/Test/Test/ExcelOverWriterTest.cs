@@ -46,6 +46,8 @@ namespace Test
             public int Id { get; set; }
         }
 
+        const string EmptySheetInputFileName = "EmptySheetTest.xlsx";
+
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
@@ -56,6 +58,29 @@ namespace Test
                 Directory.Delete(TestEnvironment.TestResultsPath, true);
             }
             Directory.CreateDirectory(TestEnvironment.TestResultsPath);
+
+            var emptySheetInputPath = Path.Combine(TestEnvironment.PdfSrcPath, EmptySheetInputFileName);
+            if (!File.Exists(emptySheetInputPath))
+            {
+                Directory.CreateDirectory(TestEnvironment.PdfSrcPath);
+                CreateEmptySheetInputWorkbook(emptySheetInputPath);
+            }
+        }
+
+        static void CreateEmptySheetInputWorkbook(string path)
+        {
+            using var book = new XLWorkbook();
+            var sheet = book.AddWorksheet("Sheet1");
+            sheet.Cell(1, 1).SetValue("Header");
+            sheet.Cell(2, 1).SetValue("#LoopRow($Details, x, 1)");
+            sheet.Cell(2, 2).SetValue("$x.Text");
+
+            // Templates created when Excel defaulted to 3 sheets often keep Sheet2/Sheet3
+            // with no used cells at all.
+            book.AddWorksheet("Sheet2");
+            book.AddWorksheet("Sheet3");
+
+            book.SaveAs(path);
         }
 
         [Test]
@@ -555,6 +580,27 @@ namespace Test
 
             using var outStream = ExcelConverter.ConvertToPdf(Path.Combine(TestEnvironment.TestResultsPath, "MultiPageSheetPageTest.xlsx"));
             File.WriteAllBytes(Path.Combine(TestEnvironment.TestResultsPath, "MultiPageSheetPageTest.pdf"), outStream.ToArray());
+        }
+
+        [Test]
+        public async Task EmptySheetTest()
+        {
+            var data = new SimpleDataOwner();
+            data.Details.Add(new SimpleData { Text = "Test1", Number = 1 });
+            data.Details.Add(new SimpleData { Text = "Test2", Number = 2 });
+
+            using (var stream = new FileStream(Path.Combine(TestEnvironment.PdfSrcPath, EmptySheetInputFileName), FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var book = new XLWorkbook(stream))
+            {
+                // Must not throw even though Sheet2/Sheet3 have no used cells.
+                await book.OverWrite(new ObjectExcelSymbolConverter(data));
+                book.SaveAs(Path.Combine(TestEnvironment.TestResultsPath, "EmptySheetTest.xlsx"));
+
+                var sheet = book.Worksheet("Sheet1");
+                sheet.Cell(1, 1).Value.GetText().Is("Header");
+                sheet.Cell(2, 2).Value.GetText().Is("Test1");
+                sheet.Cell(3, 2).Value.GetText().Is("Test2");
+            }
         }
 
         [Test]

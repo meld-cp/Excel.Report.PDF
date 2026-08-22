@@ -42,7 +42,7 @@ namespace Excel.Report.PDF
         {
             var usedRows = sheet.RowsUsed();
             rowCount = usedRows.OfType<IXLRow>().LastOrDefault()?.RowNumber() ?? 0;
-            colCount = usedRows.OfType<IXLRow>().Select(e => e.CellsUsed().OfType<IXLCell>().LastOrDefault()?.Address?.ColumnNumber ?? 0).Max();
+            colCount = usedRows.OfType<IXLRow>().Select(e => e.CellsUsed().OfType<IXLCell>().LastOrDefault()?.Address?.ColumnNumber ?? 0).DefaultIfEmpty(0).Max();
         }
 
         static List<List<T>> ReadAll<T>(this IXLWorksheet sheet, Func<int, int, T> getter, T defaultValue)
