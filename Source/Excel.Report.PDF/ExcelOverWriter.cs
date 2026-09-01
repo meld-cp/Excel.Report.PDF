@@ -456,7 +456,7 @@ namespace Excel.Report.PDF
                 isFirstLoop = false;
 
                 // Subtract duplicate rows from the processed rows
-                endRow += processedRows - rowCopyCount;
+                endRow += (processedRows - rowCopyCount);
             }
             else
             {
