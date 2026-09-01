@@ -381,10 +381,10 @@ namespace Test
             using (var stream = new FileStream(Path.Combine(TestEnvironment.PdfSrcPath, "RecursiveLoopTest(2Loop).xlsx"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var book = new XLWorkbook(stream))
             {
-                await book.Worksheet(1).OverWrite(new ObjectExcelSymbolConverter(data));
-                book.SaveAs(Path.Combine(TestEnvironment.TestResultsPath, "RecursiveLoopTest(2Loop).xlsx"));
-
                 var sheet = book.Worksheets.First();
+
+                await sheet.OverWrite(new ObjectExcelSymbolConverter(data));
+                book.SaveAs(Path.Combine(TestEnvironment.TestResultsPath, "RecursiveLoopTest(2Loop).xlsx" ) );
 
                 // B1:the part unrelated to the loop, verify if the data is output as it is.
                 var noLoopData = sheet.Cell(1, 2).Value.GetText();
@@ -413,10 +413,91 @@ namespace Test
                 // B9:The last iteration of Loop2 within the last iteration of Loop1, verify if the value is stored as it is.
                 var lastLoop2DatawithinLastLoop1 = sheet.Cell(9, 2).Value.GetNumber().ToString();
                 lastLoop2DatawithinLastLoop1.Is("33");
+
+                // D2: Fill should be yellow
+                var d2FillColor = sheet.Cell( 2, 4 ).Style.Fill.BackgroundColor.Color;
+                d2FillColor.Is( XLColor.Yellow.Color, "D2 should be yellow" );
+
+                // D3: Fill should be red
+                var d3FillColor = sheet.Cell( 3, 4 ).Style.Fill.BackgroundColor.Color;
+                d3FillColor.Is( XLColor.Red.Color, "D3 should be red" );
+
+                // D6: Fill should be yellow
+                var d6FillColor = sheet.Cell( 6, 4 ).Style.Fill.BackgroundColor.Color;
+                d6FillColor.Is( XLColor.Yellow.Color, "D6 should be yellow" );
             }
 
-            using var outStream = ExcelConverter.ConvertToPdf(Path.Combine(TestEnvironment.TestResultsPath, "RecursiveLoopTest(2Loop).xlsx"), 1);
-            File.WriteAllBytes(Path.Combine(TestEnvironment.TestResultsPath, "RecursiveLoopTest(2Loop).pdf"), outStream.ToArray());
+            using var outStream = ExcelConverter.ConvertToPdf(Path.Combine(TestEnvironment.TestResultsPath, "RecursiveLoopTest(2Loop).xlsx" ), 1);
+            File.WriteAllBytes(Path.Combine(TestEnvironment.TestResultsPath, "RecursiveLoopTest(2Loop).pdf" ), outStream.ToArray());
+        }
+
+        [Test]
+        public async Task RecursiveLoop2MergedTest() {
+            var data = new Data {
+                Name = "NameA"
+            };
+
+            var loop1_1 = new Loop1 {
+                Text = "Test1"
+            };
+
+            loop1_1.Loop2.Add( new Loop2 { Id = 1 } );
+            loop1_1.Loop2.Add( new Loop2 { Id = 2 } );
+            loop1_1.Loop2.Add( new Loop2 { Id = 3 } );
+
+            var loop1_2 = new Loop1 {
+                Text = "Test2"
+            };
+
+            loop1_2.Loop2.Add( new Loop2 { Id = 11 } );
+            loop1_2.Loop2.Add( new Loop2 { Id = 22 } );
+            loop1_2.Loop2.Add( new Loop2 { Id = 33 } );
+
+            data.Loop1.Add( loop1_1 );
+            data.Loop1.Add( loop1_2 );
+
+            using (var stream = new FileStream( Path.Combine( TestEnvironment.PdfSrcPath, "RecursiveLoopTest(2LoopMerged).xlsx" ), FileMode.Open, FileAccess.Read, FileShare.ReadWrite ))
+            using (var book = new XLWorkbook( stream )) {
+                var sheet = book.Worksheets.First();
+
+                await sheet.OverWrite( new ObjectExcelSymbolConverter( data ) );
+                book.SaveAs( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(2LoopMerged).xlsx" ) );
+
+                // B2: should be merged with D2
+                var b2MergedRange = sheet.Cell( 2, 2 ).MergedRange();
+                b2MergedRange.IsNotNull();
+                b2MergedRange.RangeAddress.FirstAddress.RowNumber.Is( 2 );
+                b2MergedRange.RangeAddress.FirstAddress.ColumnNumber.Is( 2 );
+                b2MergedRange.RangeAddress.LastAddress.RowNumber.Is( 2 );
+                b2MergedRange.RangeAddress.LastAddress.ColumnNumber.Is( 4 );
+
+                // B9: should be merged with D9
+                var b9MergedRange = sheet.Cell( 9, 2 ).MergedRange();
+                b9MergedRange.IsNotNull();
+                b9MergedRange.RangeAddress.FirstAddress.RowNumber.Is( 9 );
+                b9MergedRange.RangeAddress.FirstAddress.ColumnNumber.Is( 2 );
+                b9MergedRange.RangeAddress.LastAddress.RowNumber.Is( 9 );
+                b9MergedRange.RangeAddress.LastAddress.ColumnNumber.Is( 4 );
+
+                // B3: should be merged until F4
+                var b3MergedRange = sheet.Cell( 3, 2 ).MergedRange();
+                b3MergedRange.IsNotNull();
+                b3MergedRange.RangeAddress.FirstAddress.RowNumber.Is( 3 );
+                b3MergedRange.RangeAddress.FirstAddress.ColumnNumber.Is( 2 );
+                b3MergedRange.RangeAddress.LastAddress.RowNumber.Is( 4 );
+                b3MergedRange.RangeAddress.LastAddress.ColumnNumber.Is( 6 );
+
+                // B14: should be merged until F15
+                var b14MergedRange = sheet.Cell( 14, 2 ).MergedRange();
+                b14MergedRange.IsNotNull();
+                b14MergedRange.RangeAddress.FirstAddress.RowNumber.Is( 14 );
+                b14MergedRange.RangeAddress.FirstAddress.ColumnNumber.Is( 2 );
+                b14MergedRange.RangeAddress.LastAddress.RowNumber.Is( 15 );
+                b14MergedRange.RangeAddress.LastAddress.ColumnNumber.Is( 6 );
+            }
+
+            using var outStream = ExcelConverter.ConvertToPdf( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(2LoopMerged).xlsx" ), 1 );
+            File.WriteAllBytes( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(2LoopMerged).pdf" ), outStream.ToArray() );
         }
 
         [Test]
