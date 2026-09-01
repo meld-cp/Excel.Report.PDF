@@ -3,14 +3,14 @@ using System.Collections;
 
 namespace Excel.Report.PDF
 {
-    public static class ExcelOverWriterOptimized
+    public static class ExcelOverWriterNew
     {
         static List<IOverWriteFunction> _overWriteFunctions = new() { new ImageOverWriteFunction(), new QRCodeOverWriteFunction() };
         public static void RegisterOverWriteFunction(IOverWriteFunction function)
             => _overWriteFunctions.Add(function);
 
         class PageLoopRowsInfo
-        {
+        { 
             public List<object?> List { get; set; } = new();
 
             public string FirstPageSheetName { get; set; } = string.Empty;
@@ -33,7 +33,7 @@ namespace Excel.Report.PDF
             Last
         }
 
-        public static async Task OverWrite(XLWorkbook book, IExcelSymbolConverter converter)
+        public static async Task OverWrite(this XLWorkbook book, IExcelSymbolConverter converter)
         {
             var pagedLoopRowsInfos = await GetPagedLoopRowInfos(book, converter);
 
@@ -45,7 +45,7 @@ namespace Excel.Report.PDF
             }
         }
 
-        public static async Task OverWrite(IXLWorksheet sheet, IExcelSymbolConverter converter)
+        public static async Task OverWrite(this IXLWorksheet sheet, IExcelSymbolConverter converter)
             => await OverWrite(sheet, converter, new());
 
         static void AdjustBodySheets(XLWorkbook book, Dictionary<string, PageLoopRowsInfo> pagedLoopRowsInfos)
@@ -70,6 +70,7 @@ namespace Excel.Report.PDF
             {
                 ExcelUtils.GetRowColCount(sheet, out var rowCount, out var colCount);
 
+                // get left cells and check #PagedLoopRows
                 List<string> leftCells = new();
                 int pagedLoopCount = 0;
                 for (int i = 0; i <= rowCount; i++)
@@ -80,9 +81,10 @@ namespace Excel.Report.PDF
                     if (1 < pagedLoopCount) throw new Exception($"One sheet can have only one #PagedLoopRows. SheetName:{sheet.Name}");
                     leftCells.Add(text);
                 }
-
-                foreach (var leftCell in leftCells)
+                
+                foreach(var leftCell in leftCells)
                 {
+                    //#PagedLoopRows(pageType, rowsPerPage, $items, items, blockRowCount)
                     if (leftCell.StartsWith("#PagedLoopRows"))
                     {
                         var args = leftCell.Replace("#PagedLoopRows", "").Replace("(", "").Replace(")", "").Split(',').Select(e => e.Trim()).ToArray();
@@ -124,6 +126,7 @@ namespace Excel.Report.PDF
                 }
             }
 
+            //Distributing Lists per page
             foreach (var e in pagedLoopRowsInfos)
             {
                 if (!e.Value.List.Any())
@@ -158,7 +161,7 @@ namespace Excel.Report.PDF
                     e.Value.BodyPageLists = body;
                     e.Value.LastPageList = rest;
 
-                    for (int i = 0; i < body.Count; i++)
+                    for(int i = 0; i < body.Count; i++)
                     {
                         e.Value.BodyPageSheetNames.Add($"{e.Value.SourceBodyPageSheetName}_{i}");
                     }
@@ -169,6 +172,7 @@ namespace Excel.Report.PDF
 
         static async Task OverWrite(IXLWorksheet sheet, IExcelSymbolConverter converter, List<PageLoopRowsInfo> pageLoopRowsInfoList)
         {
+            // Get all rows and columns of the sheet
             ExcelUtils.GetRowColCount(sheet, out var rowCount, out var colCount);
             await OverWrite(sheet, 1, rowCount, colCount, converter, pageLoopRowsInfoList);
         }
@@ -178,6 +182,12 @@ namespace Excel.Report.PDF
             for (int i = startRow; i <= endRow;)
             {
                 var leftText = sheet.GetText(i, 1).Trim();
+
+                // On a loop directive row, suppress custom function invocations in this pre-pass:
+                // $item.* references resolve to null with the outer converter, so a naive function
+                // would write garbage into the template cell and CopyRows would propagate it.
+                // The recursive pass runs OverWriteCell again with the per-element converter and
+                // invokes functions there with resolved args.
                 var isLoopRow = leftText.StartsWith("#LoopRow") || leftText.StartsWith("#PagedLoopRows");
                 await OverWriteCell(sheet, i, colCount, async t => await converter.GetData(t), isLoopRow);
 
@@ -196,6 +206,7 @@ namespace Excel.Report.PDF
                     continue;
                 }
 
+                // delete #LoopRow
                 var cell = sheet.Cell(i, 1);
                 cell.SetValue(XLCellValue.FromObject(null));
 
@@ -208,8 +219,9 @@ namespace Excel.Report.PDF
                             sheet.Row(i).Delete();
                         }
                     }
-                    else
+                    else 
                     {
+                        //$Empty cells of strings beginning with $
                         for (int j = 1; j <= colCount; j++)
                         {
                             var x = sheet.Cell(i, j);
@@ -223,17 +235,24 @@ namespace Excel.Report.PDF
                     continue;
                 }
 
+                // copy rows
                 CopyRows(sheet, i, loopInfo.RowCopyCount, loopInfo.LoopList.Count, loopInfo.IsInsertMode, loopInfo.IsFormatCopy, colCount);
 
+                // over write
                 bool isFirstLoop = true;
                 foreach (var e in loopInfo.LoopList)
                 {
                     var elementConverter = converter.CreateChildExcelSymbolConverter(e, loopInfo.LoopName);
+
+                    // Recursive Processing
                     var processedRows = await OverWrite(sheet, i, i + loopInfo.RowCopyCount - 1, colCount, elementConverter, pageLoopRowsInfoList);
                     i += processedRows;
+
+                    // Increment endRow
                     endRow = IncrementEndRow(ref isFirstLoop, endRow, processedRows, loopInfo.RowCopyCount);
                 }
             }
+            // Processed Rows
             return endRow - startRow + 1;
         }
 
@@ -247,7 +266,7 @@ namespace Excel.Report.PDF
         }
 
         static async Task<bool> TryParseLoop(string leftCell, IExcelSymbolConverter converter, LoopInfo loopInfo, string sheetName, List<PageLoopRowsInfo> pageLoopRowsInfoList)
-        {
+        { 
             if (await TryParseLoopNormal(leftCell, converter, loopInfo)) return true;
             return TryParsePageLoop(leftCell, converter, loopInfo, sheetName, pageLoopRowsInfoList);
         }
@@ -257,10 +276,12 @@ namespace Excel.Report.PDF
             if (!leftCell.StartsWith("#LoopRow")) return false;
             var isLoopRowData = leftCell.StartsWith("#LoopRowData");
 
+            // #LoopRow($list, i, rowCopyCount)
             var args = isLoopRowData
                 ? leftCell.Replace("#LoopRowData", "").Replace("(", "").Replace(")", "").Split(',').Select(e => e.Trim()).ToArray()
                 : leftCell.Replace("#LoopRow", "").Replace("(", "").Replace(")", "").Split(',').Select(e => e.Trim()).ToArray();
 
+            // rowCopyCount is optional
             var rowCopyCount = 1;
             if (args.Length == 3)
             {
@@ -270,7 +291,9 @@ namespace Excel.Report.PDF
             loopInfo.IsFormatCopy = !isLoopRowData;
             loopInfo.RowCopyCount = rowCopyCount;
 
+            // #list and i(enumerable name) are must
             if (args.Length < 2) return false;
+
             if (!args[0].StartsWith("$")) return false;
             var enumerableName = args[0].Substring(1);
             loopInfo.LoopName = args[1];
@@ -279,6 +302,7 @@ namespace Excel.Report.PDF
             if (enumerable == null) return false;
 
             loopInfo.LoopList = enumerable.OfType<object?>().ToList();
+
             return true;
         }
 
@@ -324,17 +348,18 @@ namespace Excel.Report.PDF
             {
                 var cellIndex = i + 1;
                 var text = sheet.GetText(rowIndex, cellIndex).Trim();
+
                 if (text.StartsWith("#"))
                 {
                     if (skipFunctions) continue;
-                    foreach (var function in _overWriteFunctions)
+                    foreach(var function in _overWriteFunctions)
                     {
                         if (text.StartsWith($"#{function.Name}("))
                         {
                             var argsText = text.Replace($"#{function.Name}", "").Replace("(", "").Replace(")", "");
                             var args = new List<object?>();
                             foreach (var e in argsText.Split(',').Select(e => e.Trim()))
-                            {
+                            { 
                                 if (e.StartsWith("$"))
                                 {
                                     var x = await converter(e.Substring(1));
@@ -360,7 +385,7 @@ namespace Excel.Report.PDF
         }
 
         static void SetCellData(IXLWorksheet sheet, int rowIndex, int cellIndex, ExcelOverWriteCell? cellData)
-        {
+        { 
             if (cellData == null) return;
             var cell = sheet.Cell(rowIndex, cellIndex);
             cell.SetValue(XLCellValue.FromObject(cellData.Value));
@@ -429,6 +454,8 @@ namespace Excel.Report.PDF
             if (isFirstLoop)
             {
                 isFirstLoop = false;
+
+                // Subtract duplicate rows from the processed rows
                 endRow += processedRows - rowCopyCount;
             }
             else

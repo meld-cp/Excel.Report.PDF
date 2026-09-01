@@ -3,7 +3,7 @@ using System.Collections;
 
 namespace Excel.Report.PDF
 {
-    public static class ExcelOverWriter
+    public static class ExcelOverWriterOrig
     {
         static List<IOverWriteFunction> _overWriteFunctions = new() { new ImageOverWriteFunction(), new QRCodeOverWriteFunction() };
         public static void RegisterOverWriteFunction(IOverWriteFunction function)
@@ -33,7 +33,7 @@ namespace Excel.Report.PDF
             Last
         }
 
-        public static async Task OverWrite(this XLWorkbook book, IExcelSymbolConverter converter)
+        public static async Task OverWrite(XLWorkbook book, IExcelSymbolConverter converter)
         {
             var pagedLoopRowsInfos = await GetPagedLoopRowInfos(book, converter);
 
@@ -45,7 +45,7 @@ namespace Excel.Report.PDF
             }
         }
 
-        public static async Task OverWrite(this IXLWorksheet sheet, IExcelSymbolConverter converter)
+        public static async Task OverWrite(IXLWorksheet sheet, IExcelSymbolConverter converter)
             => await OverWrite(sheet, converter, new());
 
         static void AdjustBodySheets(XLWorkbook book, Dictionary<string, PageLoopRowsInfo> pagedLoopRowsInfos)

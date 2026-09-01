@@ -420,20 +420,21 @@ namespace Test
         }
 
         [Test]
-        [Explicit("This test is intended for performance testing")]
+        [Explicit( "This test is intended for performance testing" )]
         public async Task RecursiveLargeLoopCompareTest()
         {
             var sourceData = Enumerable
-                .Range(0, 1000)
+                .Range( 0, 1000 )
                 .Select( r =>
                     {
                         var g1Header = string.Concat( "[G1.", r % 100, "] Prop1" );
                         var g2Header = string.Concat( "[G2.", r % 10, "] Prop2" );
                         return new DataManyProps()
-                        {
-                            Prop1 = g1Header,
-                            Prop2 = g2Header
-                        };
+                            {
+                                Prop1 = g1Header,
+                                Prop2 = g2Header
+                            }
+                        ;
                     }
                 )
                 .ToArray()
@@ -448,14 +449,14 @@ namespace Test
                     {
                         Header1 = g.Key,
                         Loop2Data = g
-                            .GroupBy( x => x.Prop2 )
-                            .Select( g2 => new
-                                {
-                                    Header2 = g2.Key,
-                                    Loop3Data = g2
-                                }
-                            )
-                            .ToArray()
+                                .GroupBy( x => x.Prop2 )
+                                .Select( g2 => new
+                                    {
+                                        Header2 = g2.Key,
+                                        Loop3Data = g2
+                                    }
+                                )
+                                .ToArray()
                     }
                 )
                 .ToArray()
@@ -472,17 +473,17 @@ namespace Test
             using var optimizedBook = new XLWorkbook( new MemoryStream( templateBytes, writable: false ) );
 
             var originalStopwatch = System.Diagnostics.Stopwatch.StartNew();
-            await originalBook.Worksheet( 1 ).OverWrite( new ObjectExcelSymbolConverter( data ) );
+            await ExcelOverWriterOrig.OverWrite(originalBook.Worksheet( 1 ), new ObjectExcelSymbolConverter( data ) );
             originalStopwatch.Stop();
 
             var optimizedStopwatch = System.Diagnostics.Stopwatch.StartNew();
-            await ExcelOverWriterOptimized.OverWrite( optimizedBook.Worksheet( 1 ), new ObjectExcelSymbolConverter( data ) );
+            await ExcelOverWriterNew.OverWrite( optimizedBook.Worksheet( 1 ), new ObjectExcelSymbolConverter( data ) );
             optimizedStopwatch.Stop();
 
             //optimizedBook.SaveAs( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(LargeProps)Result.xlsx" ) );
 
 
-            static void AssertResult( IXLWorksheet sheet )
+            static void AssertResult(IXLWorksheet sheet)
             {
                 Assert.That( sheet.Cell( 1, 2 ).GetText(), Is.EqualTo( "NameA" ) );
                 Assert.That( sheet.Cell( 2, 2 ).GetText(), Is.EqualTo( "[G1.0] Prop1" ) );
@@ -503,57 +504,6 @@ namespace Test
             Console.WriteLine( $"Speedup: {(double)originalStopwatch.ElapsedMilliseconds / optimizedStopwatch.ElapsedMilliseconds:0.00}x" );
         }
 
-        [Test]
-        [Explicit( "This test may take a long time to run." )]
-        public async Task RecursiveLargeLoopTest() {
-            var sourceData = Enumerable
-                .Range( 0, 100000 )
-                .Select( r => {
-                    var g1Header = string.Concat( "[G1.", r % 100, "] Prop1" );
-                    var g2Header = string.Concat( "[G2.", r % 10, "] Prop2" );
-                    return new DataManyProps() {
-                        Prop1 = g1Header,
-                        Prop2 = g2Header
-                    };
-                } )
-                .ToArray()
-            ;
-
-            var data = new {
-                Name = "NameA",
-                Loop1Data = sourceData
-                .GroupBy( x => x.Prop1 )
-                .Select( g => new {
-                    Header1 = g.Key,
-                    Loop2Data = g
-                        .GroupBy( x => x.Prop2 )
-                        .Select( g2 => new {
-                            Header2 = g2.Key,
-                            Loop3Data = g2
-                        } )
-                        .ToArray()
-                } )
-                .ToArray()
-            };
-
-            using var templateStream = new FileStream( Path.Combine( TestEnvironment.PdfSrcPath, "RecursiveLoopTest(LargeProps).xlsx" ), FileMode.Open, FileAccess.Read, FileShare.ReadWrite );
-            using var optimizedBook = new XLWorkbook( templateStream );
-            var sheet = optimizedBook.Worksheet( 1 );
-            await ExcelOverWriterOptimized.OverWrite( sheet, new ObjectExcelSymbolConverter( data ) );
-            optimizedBook.SaveAs( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(LargeProps)Result.xlsx" ) );
-
-            using (Assert.EnterMultipleScope()) {
-                Assert.That( sheet.Cell( 1, 2 ).GetText(), Is.EqualTo( "NameA" ) );
-                Assert.That( sheet.Cell( 2, 2 ).GetText(), Is.EqualTo( "[G1.0] Prop1" ) );
-                Assert.That( sheet.Cell( 3, 3 ).GetText(), Is.EqualTo( "[G2.0] Prop2" ) );
-                Assert.That( sheet.Cell( 4, 4 ).GetText(), Is.EqualTo( "[G1.0] Prop1" ) );
-                Assert.That( sheet.Cell( 4, 5 ).GetText(), Is.EqualTo( "[G2.0] Prop2" ) );
-                Assert.That( sheet.Cell( 10201, 43 ).GetText(), Is.EqualTo( "Prop40" ) );
-            }
-
-            //using var outStream = ExcelConverter.ConvertToPdf( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(LargeProps).xlsx" ), 1 );
-            //File.WriteAllBytes( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(LargeProps).pdf" ), outStream.ToArray() );
-        }
 
         [Test]
         public void TestCopyPage()
