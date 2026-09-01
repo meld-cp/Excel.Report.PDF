@@ -93,6 +93,9 @@ namespace Test
             public string Prop40 { get; set; } = "Prop40";
         }
 
+        const string RecursiveLoop2TestInputFileName = "ExcelOverWriterTest_RecursiveLoop2Test.xlsx";
+        const string RecursiveLoop2TestMergedInputFileName = "ExcelOverWriterTest_RecursiveLoop2Test(Merged).xlsx";
+
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
@@ -103,6 +106,65 @@ namespace Test
                 Directory.Delete(TestEnvironment.TestResultsPath, true);
             }
             Directory.CreateDirectory(TestEnvironment.TestResultsPath);
+
+
+            // Generate input files if they do not exist
+            var recursiveLoop2TestInputPath = Path.Combine( TestEnvironment.PdfSrcPath, RecursiveLoop2TestInputFileName );
+            if (!File.Exists( recursiveLoop2TestInputPath ))
+            {
+                Directory.CreateDirectory( TestEnvironment.PdfSrcPath );
+                RecursiveLoop2TestInputWorkbook( recursiveLoop2TestInputPath );
+            }
+
+            var recursiveLoop2TestMergedInputPath = Path.Combine( TestEnvironment.PdfSrcPath, RecursiveLoop2TestMergedInputFileName );
+            if (!File.Exists( recursiveLoop2TestMergedInputPath ))
+            {
+                Directory.CreateDirectory( TestEnvironment.PdfSrcPath );
+                RecursiveLoop2TestMergedInputWorkbook( recursiveLoop2TestMergedInputPath );
+            }
+
+        }
+
+        private void RecursiveLoop2TestInputWorkbook(string path)
+        {
+            using var book = new XLWorkbook();
+            var sheet = book.AddWorksheet( "Sheet1" );
+
+            // Header row (literal — outside the loop).
+            sheet.Cell( 1, 2 ).SetValue( "$Name" );
+
+            // 2-row #LoopRow block (insert mode). Row 2 is the directive, row 3 is the
+            // block's second row.
+            sheet.Column( 1 ).Width = 30;
+            sheet.Cell( 2, 1 ).SetValue( "#LoopRow($Loop1, x, 2)" );
+            sheet.Cell( 2, 2 ).SetValue( "$x.Text" );
+            sheet.Cell( 2, 4 ).Style.Fill.BackgroundColor = XLColor.Yellow;
+            sheet.Cell( 3, 1 ).SetValue( "#LoopRow($x.Loop2, y, 1)" );
+            sheet.Cell( 3, 2 ).SetValue( "$y.Id" );
+            sheet.Cell( 3, 4 ).Style.Fill.BackgroundColor = XLColor.Red;
+
+            book.SaveAs( path );
+        }
+
+        private void RecursiveLoop2TestMergedInputWorkbook(string path)
+        {
+            using var book = new XLWorkbook();
+            var sheet = book.AddWorksheet( "Sheet1" );
+
+            // Header row (literal — outside the loop).
+            sheet.Cell( 1, 2 ).SetValue( "$Name" );
+
+            // 2-row #LoopRow block (insert mode). Row 2 is the directive, row 3 is the
+            // block's second row.
+            sheet.Column( 1 ).Width = 30;
+            sheet.Cell( 2, 1 ).SetValue( "#LoopRow($Loop1, x, 3)" );
+            sheet.Range( 2, 2, 2, 4 ).Merge();
+            sheet.Cell( 2, 2 ).SetValue( "$x.Text" );
+            sheet.Cell( 3, 1 ).SetValue( "#LoopRow($x.Loop2, y, 2)" );
+            sheet.Range( 3, 2, 4, 6 ).Merge();
+            sheet.Cell( 3, 2 ).SetValue( "$y.Id" );
+
+            book.SaveAs( path );
         }
 
         [Test]
@@ -378,13 +440,13 @@ namespace Test
             data.Loop1.Add(loop1_1);
             data.Loop1.Add(loop1_2);
 
-            using (var stream = new FileStream(Path.Combine(TestEnvironment.PdfSrcPath, "RecursiveLoopTest(2Loop).xlsx"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var stream = new FileStream(Path.Combine(TestEnvironment.PdfSrcPath, RecursiveLoop2TestInputFileName), FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var book = new XLWorkbook(stream))
             {
                 var sheet = book.Worksheets.First();
 
                 await sheet.OverWrite(new ObjectExcelSymbolConverter(data));
-                book.SaveAs(Path.Combine(TestEnvironment.TestResultsPath, "RecursiveLoopTest(2Loop).xlsx" ) );
+                book.SaveAs(Path.Combine(TestEnvironment.TestResultsPath, RecursiveLoop2TestInputFileName ) );
 
                 // B1:the part unrelated to the loop, verify if the data is output as it is.
                 var noLoopData = sheet.Cell(1, 2).Value.GetText();
@@ -427,8 +489,8 @@ namespace Test
                 d6FillColor.Is( XLColor.Yellow.Color, "D6 should be yellow" );
             }
 
-            using var outStream = ExcelConverter.ConvertToPdf(Path.Combine(TestEnvironment.TestResultsPath, "RecursiveLoopTest(2Loop).xlsx" ), 1);
-            File.WriteAllBytes(Path.Combine(TestEnvironment.TestResultsPath, "RecursiveLoopTest(2Loop).pdf" ), outStream.ToArray());
+            using var outStream = ExcelConverter.ConvertToPdf(Path.Combine(TestEnvironment.TestResultsPath, RecursiveLoop2TestInputFileName ), 1);
+            File.WriteAllBytes(Path.Combine(TestEnvironment.TestResultsPath, Path.ChangeExtension( RecursiveLoop2TestInputFileName, "pdf" ) ), outStream.ToArray());
         }
 
         [Test]
@@ -456,12 +518,12 @@ namespace Test
             data.Loop1.Add( loop1_1 );
             data.Loop1.Add( loop1_2 );
 
-            using (var stream = new FileStream( Path.Combine( TestEnvironment.PdfSrcPath, "RecursiveLoopTest(2LoopMerged).xlsx" ), FileMode.Open, FileAccess.Read, FileShare.ReadWrite ))
+            using (var stream = new FileStream( Path.Combine( TestEnvironment.PdfSrcPath, RecursiveLoop2TestMergedInputFileName ), FileMode.Open, FileAccess.Read, FileShare.ReadWrite ))
             using (var book = new XLWorkbook( stream )) {
                 var sheet = book.Worksheets.First();
 
                 await sheet.OverWrite( new ObjectExcelSymbolConverter( data ) );
-                book.SaveAs( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(2LoopMerged).xlsx" ) );
+                book.SaveAs( Path.Combine( TestEnvironment.TestResultsPath, RecursiveLoop2TestMergedInputFileName ) );
 
                 // B2: should be merged with D2
                 var b2MergedRange = sheet.Cell( 2, 2 ).MergedRange();
@@ -496,8 +558,8 @@ namespace Test
                 b14MergedRange.RangeAddress.LastAddress.ColumnNumber.Is( 6 );
             }
 
-            using var outStream = ExcelConverter.ConvertToPdf( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(2LoopMerged).xlsx" ), 1 );
-            File.WriteAllBytes( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(2LoopMerged).pdf" ), outStream.ToArray() );
+            using var outStream = ExcelConverter.ConvertToPdf( Path.Combine( TestEnvironment.TestResultsPath, RecursiveLoop2TestMergedInputFileName ), 1 );
+            File.WriteAllBytes( Path.Combine( TestEnvironment.TestResultsPath, Path.ChangeExtension( RecursiveLoop2TestMergedInputFileName, "pdf" ) ), outStream.ToArray() );
         }
 
 
