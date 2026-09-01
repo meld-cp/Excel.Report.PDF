@@ -46,53 +46,6 @@ namespace Test
             public int Id { get; set; }
         }
 
-        class DataManyProps
-        {
-            public string Prop1 { get; set; } = "Prop1";
-            public string Prop2 { get; set; } = "Prop2";
-            public string Prop3 { get; set; } = "Prop3";
-            public string Prop4 { get; set; } = "Prop4";
-            public string Prop5 { get; set; } = "Prop5";
-            public string Prop6 { get; set; } = "Prop6";
-            public string Prop7 { get; set; } = "Prop7";
-            public string Prop8 { get; set; } = "Prop8";
-            public string Prop9 { get; set; } = "Prop9";
-            public string Prop10 { get; set; } = "Prop10";
-
-            public string Prop11 { get; set; } = "Prop11";
-            public string Prop12 { get; set; } = "Prop12";
-            public string Prop13 { get; set; } = "Prop13";
-            public string Prop14 { get; set; } = "Prop14";
-            public string Prop15 { get; set; } = "Prop15";
-            public string Prop16 { get; set; } = "Prop16";
-            public string Prop17 { get; set; } = "Prop17";
-            public string Prop18 { get; set; } = "Prop18";
-            public string Prop19 { get; set; } = "Prop19";
-            public string Prop20 { get; set; } = "Prop20";
-
-            public string Prop21 { get; set; } = "Prop21";
-            public string Prop22 { get; set; } = "Prop22";
-            public string Prop23 { get; set; } = "Prop23";
-            public string Prop24 { get; set; } = "Prop24";
-            public string Prop25 { get; set; } = "Prop25";
-            public string Prop26 { get; set; } = "Prop26";
-            public string Prop27 { get; set; } = "Prop27";
-            public string Prop28 { get; set; } = "Prop28";
-            public string Prop29 { get; set; } = "Prop29";
-            public string Prop30 { get; set; } = "Prop30";
-
-            public string Prop31 { get; set; } = "Prop31";
-            public string Prop32 { get; set; } = "Prop32";
-            public string Prop33 { get; set; } = "Prop33";
-            public string Prop34 { get; set; } = "Prop34";
-            public string Prop35 { get; set; } = "Prop35";
-            public string Prop36 { get; set; } = "Prop36";
-            public string Prop37 { get; set; } = "Prop37";
-            public string Prop38 { get; set; } = "Prop38";
-            public string Prop39 { get; set; } = "Prop39";
-            public string Prop40 { get; set; } = "Prop40";
-        }
-
         const string RecursiveLoop2TestInputFileName = "ExcelOverWriterTest_RecursiveLoop2Test.xlsx";
         const string RecursiveLoop2TestMergedInputFileName = "ExcelOverWriterTest_RecursiveLoop2Test(Merged).xlsx";
 
