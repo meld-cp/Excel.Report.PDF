@@ -46,6 +46,53 @@ namespace Test
             public int Id { get; set; }
         }
 
+        class DataManyProps
+        {
+            public string Prop1 { get; set; } = "Prop1";
+            public string Prop2 { get; set; } = "Prop2";
+            public string Prop3 { get; set; } = "Prop3";
+            public string Prop4 { get; set; } = "Prop4";
+            public string Prop5 { get; set; } = "Prop5";
+            public string Prop6 { get; set; } = "Prop6";
+            public string Prop7 { get; set; } = "Prop7";
+            public string Prop8 { get; set; } = "Prop8";
+            public string Prop9 { get; set; } = "Prop9";
+            public string Prop10 { get; set; } = "Prop10";
+
+            public string Prop11 { get; set; } = "Prop11";
+            public string Prop12 { get; set; } = "Prop12";
+            public string Prop13 { get; set; } = "Prop13";
+            public string Prop14 { get; set; } = "Prop14";
+            public string Prop15 { get; set; } = "Prop15";
+            public string Prop16 { get; set; } = "Prop16";
+            public string Prop17 { get; set; } = "Prop17";
+            public string Prop18 { get; set; } = "Prop18";
+            public string Prop19 { get; set; } = "Prop19";
+            public string Prop20 { get; set; } = "Prop20";
+
+            public string Prop21 { get; set; } = "Prop21";
+            public string Prop22 { get; set; } = "Prop22";
+            public string Prop23 { get; set; } = "Prop23";
+            public string Prop24 { get; set; } = "Prop24";
+            public string Prop25 { get; set; } = "Prop25";
+            public string Prop26 { get; set; } = "Prop26";
+            public string Prop27 { get; set; } = "Prop27";
+            public string Prop28 { get; set; } = "Prop28";
+            public string Prop29 { get; set; } = "Prop29";
+            public string Prop30 { get; set; } = "Prop30";
+
+            public string Prop31 { get; set; } = "Prop31";
+            public string Prop32 { get; set; } = "Prop32";
+            public string Prop33 { get; set; } = "Prop33";
+            public string Prop34 { get; set; } = "Prop34";
+            public string Prop35 { get; set; } = "Prop35";
+            public string Prop36 { get; set; } = "Prop36";
+            public string Prop37 { get; set; } = "Prop37";
+            public string Prop38 { get; set; } = "Prop38";
+            public string Prop39 { get; set; } = "Prop39";
+            public string Prop40 { get; set; } = "Prop40";
+        }
+
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
@@ -370,6 +417,142 @@ namespace Test
 
             using var outStream = ExcelConverter.ConvertToPdf(Path.Combine(TestEnvironment.TestResultsPath, "RecursiveLoopTest(2Loop).xlsx"), 1);
             File.WriteAllBytes(Path.Combine(TestEnvironment.TestResultsPath, "RecursiveLoopTest(2Loop).pdf"), outStream.ToArray());
+        }
+
+        [Test]
+        [Explicit("This test is intended for performance testing")]
+        public async Task RecursiveLargeLoopCompareTest()
+        {
+            var sourceData = Enumerable
+                .Range(0, 1000)
+                .Select( r =>
+                    {
+                        var g1Header = string.Concat( "[G1.", r % 100, "] Prop1" );
+                        var g2Header = string.Concat( "[G2.", r % 10, "] Prop2" );
+                        return new DataManyProps()
+                        {
+                            Prop1 = g1Header,
+                            Prop2 = g2Header
+                        };
+                    }
+                )
+                .ToArray()
+            ;
+
+            var data = new
+            {
+                Name = "NameA",
+                Loop1Data = sourceData
+                .GroupBy( x => x.Prop1 )
+                .Select( g => new
+                    {
+                        Header1 = g.Key,
+                        Loop2Data = g
+                            .GroupBy( x => x.Prop2 )
+                            .Select( g2 => new
+                                {
+                                    Header2 = g2.Key,
+                                    Loop3Data = g2
+                                }
+                            )
+                            .ToArray()
+                    }
+                )
+                .ToArray()
+            };
+
+            byte[] templateBytes;
+            using (var templateStream = new FileStream( Path.Combine( TestEnvironment.PdfSrcPath, "RecursiveLoopTest(LargeProps).xlsx" ), FileMode.Open, FileAccess.Read, FileShare.ReadWrite ))
+            using (var memoryStream = new MemoryStream())
+            {
+                templateStream.CopyTo( memoryStream );
+                templateBytes = memoryStream.ToArray();
+            }
+            using var originalBook = new XLWorkbook( new MemoryStream( templateBytes, writable: false ) );
+            using var optimizedBook = new XLWorkbook( new MemoryStream( templateBytes, writable: false ) );
+
+            var originalStopwatch = System.Diagnostics.Stopwatch.StartNew();
+            await originalBook.Worksheet( 1 ).OverWrite( new ObjectExcelSymbolConverter( data ) );
+            originalStopwatch.Stop();
+
+            var optimizedStopwatch = System.Diagnostics.Stopwatch.StartNew();
+            await ExcelOverWriterOptimized.OverWrite( optimizedBook.Worksheet( 1 ), new ObjectExcelSymbolConverter( data ) );
+            optimizedStopwatch.Stop();
+
+            //optimizedBook.SaveAs( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(LargeProps)Result.xlsx" ) );
+
+
+            static void AssertResult( IXLWorksheet sheet )
+            {
+                Assert.That( sheet.Cell( 1, 2 ).GetText(), Is.EqualTo( "NameA" ) );
+                Assert.That( sheet.Cell( 2, 2 ).GetText(), Is.EqualTo( "[G1.0] Prop1" ) );
+                Assert.That( sheet.Cell( 3, 3 ).GetText(), Is.EqualTo( "[G2.0] Prop2" ) );
+                Assert.That( sheet.Cell( 4, 4 ).GetText(), Is.EqualTo( "[G1.0] Prop1" ) );
+                Assert.That( sheet.Cell( 4, 5 ).GetText(), Is.EqualTo( "[G2.0] Prop2" ) );
+                Assert.That( sheet.Cell( 1190, 2 ).GetText(), Is.EqualTo( "[G1.99] Prop1" ) );
+                Assert.That( sheet.Cell( 1191, 3 ).GetText(), Is.EqualTo( "[G2.9] Prop2" ) );
+                Assert.That( sheet.Cell( 1201, 4 ).GetText(), Is.EqualTo( "[G1.99] Prop1" ) );
+                Assert.That( sheet.Cell( 1201, 5 ).GetText(), Is.EqualTo( "[G2.9] Prop2" ) );
+            }
+
+            AssertResult( originalBook.Worksheet( 1 ) );
+            AssertResult( optimizedBook.Worksheet( 1 ) );
+
+            Console.WriteLine( $"ExcelOverWriter elapsed time: {originalStopwatch.ElapsedMilliseconds} ms" );
+            Console.WriteLine( $"ExcelOverWriterOptimized elapsed time: {optimizedStopwatch.ElapsedMilliseconds} ms" );
+            Console.WriteLine( $"Speedup: {(double)originalStopwatch.ElapsedMilliseconds / optimizedStopwatch.ElapsedMilliseconds:0.00}x" );
+        }
+
+        [Test]
+        [Explicit( "This test may take a long time to run." )]
+        public async Task RecursiveLargeLoopTest() {
+            var sourceData = Enumerable
+                .Range( 0, 100000 )
+                .Select( r => {
+                    var g1Header = string.Concat( "[G1.", r % 100, "] Prop1" );
+                    var g2Header = string.Concat( "[G2.", r % 10, "] Prop2" );
+                    return new DataManyProps() {
+                        Prop1 = g1Header,
+                        Prop2 = g2Header
+                    };
+                } )
+                .ToArray()
+            ;
+
+            var data = new {
+                Name = "NameA",
+                Loop1Data = sourceData
+                .GroupBy( x => x.Prop1 )
+                .Select( g => new {
+                    Header1 = g.Key,
+                    Loop2Data = g
+                        .GroupBy( x => x.Prop2 )
+                        .Select( g2 => new {
+                            Header2 = g2.Key,
+                            Loop3Data = g2
+                        } )
+                        .ToArray()
+                } )
+                .ToArray()
+            };
+
+            using var templateStream = new FileStream( Path.Combine( TestEnvironment.PdfSrcPath, "RecursiveLoopTest(LargeProps).xlsx" ), FileMode.Open, FileAccess.Read, FileShare.ReadWrite );
+            using var optimizedBook = new XLWorkbook( templateStream );
+            var sheet = optimizedBook.Worksheet( 1 );
+            await ExcelOverWriterOptimized.OverWrite( sheet, new ObjectExcelSymbolConverter( data ) );
+            optimizedBook.SaveAs( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(LargeProps)Result.xlsx" ) );
+
+            using (Assert.EnterMultipleScope()) {
+                Assert.That( sheet.Cell( 1, 2 ).GetText(), Is.EqualTo( "NameA" ) );
+                Assert.That( sheet.Cell( 2, 2 ).GetText(), Is.EqualTo( "[G1.0] Prop1" ) );
+                Assert.That( sheet.Cell( 3, 3 ).GetText(), Is.EqualTo( "[G2.0] Prop2" ) );
+                Assert.That( sheet.Cell( 4, 4 ).GetText(), Is.EqualTo( "[G1.0] Prop1" ) );
+                Assert.That( sheet.Cell( 4, 5 ).GetText(), Is.EqualTo( "[G2.0] Prop2" ) );
+                Assert.That( sheet.Cell( 10201, 43 ).GetText(), Is.EqualTo( "Prop40" ) );
+            }
+
+            //using var outStream = ExcelConverter.ConvertToPdf( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(LargeProps).xlsx" ), 1 );
+            //File.WriteAllBytes( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(LargeProps).pdf" ), outStream.ToArray() );
         }
 
         [Test]
