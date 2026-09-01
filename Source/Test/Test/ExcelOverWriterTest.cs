@@ -580,11 +580,10 @@ namespace Test
             AssertResult( originalBook.Worksheet( 1 ) );
             AssertResult( optimizedBook.Worksheet( 1 ) );
 
-            Console.WriteLine( $"ExcelOverWriter elapsed time: {originalStopwatch.ElapsedMilliseconds} ms" );
-            Console.WriteLine( $"ExcelOverWriterOptimized elapsed time: {optimizedStopwatch.ElapsedMilliseconds} ms" );
+            Console.WriteLine( $"Original elapsed time: {originalStopwatch.ElapsedMilliseconds} ms" );
+            Console.WriteLine( $"Optimized elapsed time: {optimizedStopwatch.ElapsedMilliseconds} ms" );
             Console.WriteLine( $"Speedup: {(double)originalStopwatch.ElapsedMilliseconds / optimizedStopwatch.ElapsedMilliseconds:0.00}x" );
         }
-
 
         [Test]
         public void TestCopyPage()
