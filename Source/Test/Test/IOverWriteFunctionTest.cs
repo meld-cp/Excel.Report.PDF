@@ -75,10 +75,8 @@ namespace Test
             // Custom function registration is global; register only once even if tests rerun.
             if (!_registered)
             {
-                ExcelOverWriterOrig.RegisterOverWriteFunction(_joinFunction);
-                ExcelOverWriterOrig.RegisterOverWriteFunction(_naiveFunction);
-                ExcelOverWriterNew.RegisterOverWriteFunction( _joinFunction );
-                ExcelOverWriterNew.RegisterOverWriteFunction( _naiveFunction );
+                ExcelOverWriter.RegisterOverWriteFunction( _joinFunction );
+                ExcelOverWriter.RegisterOverWriteFunction( _naiveFunction );
                 _registered = true;
             }
 

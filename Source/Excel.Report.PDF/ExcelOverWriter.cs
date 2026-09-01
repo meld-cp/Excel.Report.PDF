@@ -3,7 +3,7 @@ using System.Collections;
 
 namespace Excel.Report.PDF
 {
-    public static class ExcelOverWriterNew
+    public static class ExcelOverWriter
     {
         static List<IOverWriteFunction> _overWriteFunctions = new() { new ImageOverWriteFunction(), new QRCodeOverWriteFunction() };
         public static void RegisterOverWriteFunction(IOverWriteFunction function)

@@ -477,7 +477,7 @@ namespace Test
             originalStopwatch.Stop();
 
             var optimizedStopwatch = System.Diagnostics.Stopwatch.StartNew();
-            await ExcelOverWriterNew.OverWrite( optimizedBook.Worksheet( 1 ), new ObjectExcelSymbolConverter( data ) );
+            await ExcelOverWriter.OverWrite( optimizedBook.Worksheet( 1 ), new ObjectExcelSymbolConverter( data ) );
             optimizedStopwatch.Stop();
 
             //optimizedBook.SaveAs( Path.Combine( TestEnvironment.TestResultsPath, "RecursiveLoopTest(LargeProps)Result.xlsx" ) );
