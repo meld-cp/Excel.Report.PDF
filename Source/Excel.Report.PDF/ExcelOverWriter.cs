@@ -1,4 +1,4 @@
-﻿using ClosedXML.Excel;
+using ClosedXML.Excel;
 using System.Collections;
 
 namespace Excel.Report.PDF
@@ -170,7 +170,7 @@ namespace Excel.Report.PDF
             return pagedLoopRowsInfos;
         }
 
-        static async Task OverWrite(this IXLWorksheet sheet, IExcelSymbolConverter converter, List<PageLoopRowsInfo> pageLoopRowsInfoList)
+        static async Task OverWrite(IXLWorksheet sheet, IExcelSymbolConverter converter, List<PageLoopRowsInfo> pageLoopRowsInfoList)
         {
             // Get all rows and columns of the sheet
             ExcelUtils.GetRowColCount(sheet, out var rowCount, out var colCount);
@@ -190,6 +190,14 @@ namespace Excel.Report.PDF
                 // invokes functions there with resolved args.
                 var isLoopRow = leftText.StartsWith("#LoopRow") || leftText.StartsWith("#PagedLoopRows");
                 await OverWriteCell(sheet, i, colCount, async t => await converter.GetData(t), isLoopRow);
+
+                // Only directive rows can contain loops. Avoid parsing every
+                // ordinary output row as a possible loop.
+                if (!isLoopRow)
+                {
+                    i++;
+                    continue;
+                }
 
                 LoopInfo loopInfo = new();
                 if (!await TryParseLoop(leftText, converter, loopInfo, sheet.Name, pageLoopRowsInfoList))
@@ -228,7 +236,7 @@ namespace Excel.Report.PDF
                 }
 
                 // copy rows
-                CopyRows(sheet, i, loopInfo.RowCopyCount, loopInfo.LoopList.Count, loopInfo.IsInsertMode, loopInfo.IsFormatCopy);
+                CopyRows(sheet, i, loopInfo.RowCopyCount, loopInfo.LoopList.Count, loopInfo.IsInsertMode, loopInfo.IsFormatCopy, colCount);
 
                 // over write
                 bool isFirstLoop = true;
@@ -269,9 +277,9 @@ namespace Excel.Report.PDF
             var isLoopRowData = leftCell.StartsWith("#LoopRowData");
 
             // #LoopRow($list, i, rowCopyCount)
-            var args = isLoopRowData ?
-                leftCell.Replace("#LoopRowData", "").Replace("(", "").Replace(")", "").Split(',').Select(e => e.Trim()).ToArray():
-                leftCell.Replace("#LoopRow", "").Replace("(", "").Replace(")", "").Split(',').Select(e => e.Trim()).ToArray();
+            var args = isLoopRowData
+                ? leftCell.Replace("#LoopRowData", "").Replace("(", "").Replace(")", "").Split(',').Select(e => e.Trim()).ToArray()
+                : leftCell.Replace("#LoopRow", "").Replace("(", "").Replace(")", "").Split(',').Select(e => e.Trim()).ToArray();
 
             // rowCopyCount is optional
             var rowCopyCount = 1;
@@ -383,9 +391,9 @@ namespace Excel.Report.PDF
             cell.SetValue(XLCellValue.FromObject(cellData.Value));
         }
 
-        static void CopyRows(IXLWorksheet sheet, int rowIndex, int rowCopyCount, int loopCount, bool isInsertMode, bool formatCopy)
+        static void CopyRows(IXLWorksheet sheet, int rowIndex, int rowCopyCount, int loopCount, bool isInsertMode, bool formatCopy, int colCount)
         {
-            var rangeToCopy = sheet.Range($"{rowIndex}:{rowIndex + rowCopyCount - 1}");
+            var rangeToCopy = sheet.Range(rowIndex, 1, rowIndex + rowCopyCount - 1, colCount);
 
             double[] srcHeights = new double[0];
             if (formatCopy)
@@ -411,12 +419,15 @@ namespace Excel.Report.PDF
                     .ToArray();
             }
 
+            if (isInsertMode && loopCount > 1)
+            {
+                sheet.Row(rowIndex + rowCopyCount).InsertRowsAbove(rowCopyCount * (loopCount - 1));
+            }
+
             for (int i = 1; i < loopCount; i++)
             {
                 var insertRowIndex = rowIndex + rowCopyCount * i;
-                var insertRow = isInsertMode ?
-                    sheet.Row(insertRowIndex).InsertRowsAbove(rowCopyCount).First() :
-                    sheet.Row(insertRowIndex);
+                var insertRow = sheet.Row(insertRowIndex);
 
                 if (formatCopy)
                 {

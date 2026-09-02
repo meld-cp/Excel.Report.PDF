@@ -396,3 +396,6 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Test input files which are auto-generated
+Source/Test/Data/ExcelOverWriterTest_*.xlsx
