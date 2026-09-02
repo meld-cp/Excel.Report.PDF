@@ -40,9 +40,9 @@ namespace Excel.Report.PDF
 
         internal static void GetRowColCount(this IXLWorksheet sheet, out int rowCount, out int colCount)
         {
-            var usedRows = sheet.RowsUsed();
+            var usedRows = sheet.RowsUsed(XLCellsUsedOptions.All);
             rowCount = usedRows.OfType<IXLRow>().LastOrDefault()?.RowNumber() ?? 0;
-            colCount = usedRows.OfType<IXLRow>().Select(e => e.CellsUsed().OfType<IXLCell>().LastOrDefault()?.Address?.ColumnNumber ?? 0).DefaultIfEmpty(0).Max();
+            colCount = usedRows.OfType<IXLRow>().Select(e => e.CellsUsed(XLCellsUsedOptions.All).OfType<IXLCell>().LastOrDefault()?.Address?.ColumnNumber ?? 0).DefaultIfEmpty(0).Max();
         }
 
         static List<List<T>> ReadAll<T>(this IXLWorksheet sheet, Func<int, int, T> getter, T defaultValue)
