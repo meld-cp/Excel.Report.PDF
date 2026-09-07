@@ -53,20 +53,22 @@ namespace Excel.Report.PDF
         {
             ExcelUtils.GetRowColCount(sheet, out var rowCount, out var colCount);
             var template = SnapshotTemplate(sheet, rowCount);
+            var autoFilter = CaptureAutoFilter(sheet);
             var plan = await BuildExpansionPlanAsync(sheet, rowCount, converter, pagePlans, template);
 
-            await MaterializeWorksheetAsync(sheet, template, plan, rowCount, colCount);
+            await MaterializeWorksheetAsync(sheet, template, plan, rowCount, colCount, autoFilter);
         }
 
         /// <summary>
         /// Writes the planned rows using batch writes or template range copies.
         /// </summary>
-        static async Task MaterializeWorksheetAsync(IXLWorksheet sheet, TemplateSnapshot template, ExpansionPlan plan, int sourceRowCount, int colCount)
+        static async Task MaterializeWorksheetAsync(IXLWorksheet sheet, TemplateSnapshot template, ExpansionPlan plan, int sourceRowCount, int colCount, AutoFilterSnapshot? autoFilter)
         {
             if (CanUsePlainValueBatch(sheet, template, plan))
             {
                 ReserveWorksheetRows(sheet, plan.Rows.Count, sourceRowCount, colCount);
                 await WriteSymbolValuesAsBatchAsync(sheet, plan.Rows, colCount);
+                RestoreAutoFilter(sheet, autoFilter);
                 return;
             }
 
@@ -90,11 +92,36 @@ namespace Excel.Report.PDF
                     RestoreMergedRanges(sheet, plan.Rows, plan.Merges);
                     await ApplyCellOperationsAsync(sheet, plan.Rows);
                 }
+                RestoreAutoFilter(sheet, autoFilter);
             }
             finally
             {
                 workbook.Worksheets.Delete(sourceName);
             }
+        }
+
+        static AutoFilterSnapshot? CaptureAutoFilter(IXLWorksheet sheet)
+        {
+            var autoFilter = sheet.AutoFilter;
+            if (autoFilter == null || !autoFilter.IsEnabled || autoFilter.Range == null) return null;
+
+            var range = autoFilter.Range.RangeAddress;
+            return new AutoFilterSnapshot(
+                range.FirstAddress.RowNumber,
+                range.FirstAddress.ColumnNumber,
+                range.LastAddress.RowNumber,
+                range.LastAddress.ColumnNumber);
+        }
+
+        static void RestoreAutoFilter(IXLWorksheet sheet, AutoFilterSnapshot? snapshot)
+        {
+            if (snapshot == null) return;
+            var value = snapshot.Value;
+            sheet.Range(
+                value.FirstRow,
+                value.FirstColumn,
+                value.LastRow,
+                value.LastColumn).SetAutoFilter();
         }
 
         #endregion
@@ -765,6 +792,8 @@ namespace Excel.Report.PDF
         /// Stores one source merge so each repeated occurrence can get translated coordinates.
         /// </summary>
         readonly record struct MergeOperation(int FirstRow, int LastRow, int FirstColumn, int LastColumn);
+
+        readonly record struct AutoFilterSnapshot(int FirstRow, int FirstColumn, int LastRow, int LastColumn);
 
         /// <summary>
         /// Describes a contiguous style run because repeated destination rows can receive it as one range.

@@ -157,6 +157,9 @@ namespace Test
             sheet.Cell( 3, 2 ).SetValue( "$y.Id" );
             sheet.Cell( 3, 4 ).Style.Fill.BackgroundColor = XLColor.Red;
 
+            // filter on C1 to D1
+            sheet.Range( 1, 3, 1, 4 ).SetAutoFilter();
+
             book.SaveAs( path );
         }
 
@@ -553,6 +556,15 @@ namespace Test
                 // D6: Fill should be yellow
                 var d6FillColor = sheet.Cell( 6, 4 ).Style.Fill.BackgroundColor.Color;
                 d6FillColor.Is( XLColor.Yellow.Color, "D6 should be yellow" );
+
+                // C1 to D1: should have autofilter
+                var autoFilter = sheet.AutoFilter;
+                autoFilter.IsNotNull();
+                autoFilter.Range.RangeAddress.FirstAddress.RowNumber.Is( 1 );
+                autoFilter.Range.RangeAddress.FirstAddress.ColumnNumber.Is( 3 );
+                autoFilter.Range.RangeAddress.LastAddress.RowNumber.Is( 1 );
+                autoFilter.Range.RangeAddress.LastAddress.ColumnNumber.Is( 4 );
+
             }
 
             using var outStream = ExcelConverter.ConvertToPdf(Path.Combine(TestEnvironment.TestResultsPath, RecursiveLoop2TestInputFileName ), 1);
